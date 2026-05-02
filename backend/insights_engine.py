@@ -1,0 +1,95 @@
+"""
+Insights Engine — Central Orchestrator
+Combines all analyzers and utils into ONE clean output.
+The FastAPI endpoint calls only this; keeps routing layer thin.
+"""
+
+from backend.analyzers import breakdown_analyzer, spike_detector, cost_drivers, waste_detector
+from backend.utils import translator, suggestions
+
+
+def generate(parsed: dict) -> dict:
+    """
+    Args:
+        parsed: output of aws_parser.parse()
+    Returns full insights payload consumed by the frontend.
+    """
+    records = parsed["records"]
+    days_count = parsed["days_count"]
+
+    # ---- Run all analyzers ----------------------------------------------
+    breakdown = breakdown_analyzer.analyze(records)
+    spike = spike_detector.detect(records, days_count)
+    drivers = cost_drivers.find(records, days_count)
+    waste = waste_detector.detect(records, days_count)
+
+    total_cost = breakdown["total_cost"]
+    period = breakdown["period_comparison"]
+
+    # ---- Translate to human language ------------------------------------
+    summary_human = translator.translate_summary(period, total_cost)
+
+    for d in drivers:
+        d["human_text"] = translator.translate_driver(d, total_cost)
+
+    for w in waste:
+        w["human_text"] = translator.translate_waste_signal(w, total_cost)
+
+    # ---- Build suggestions ----------------------------------------------
+    sugg = suggestions.build(waste, spike, total_cost)
+
+    # ---- Compute total potential savings --------------------------------
+    total_savings = sum(s["savings_inr"] for s in sugg)
+
+    # ---- Compose final payload ------------------------------------------
+    return {
+        # Summary card data
+        "summary": {
+            "last_7_days_inr": summary_human["last_7_days_inr"],
+            "previous_7_days_inr": summary_human["previous_7_days_inr"],
+            "change_pct": summary_human["change_pct"],
+            "change_amount_inr": summary_human["change_amount_inr"],
+            "trend_emoji": summary_human["trend_emoji"],
+            "trend_label": summary_human["trend_label"],
+            "narrative": summary_human["narrative"],
+            "total_potential_savings_inr": round(total_savings, 0),
+            "spike_detected": spike["spike_detected"],
+            "spike_magnitude": spike.get("spike_magnitude"),
+        },
+
+        # Top 3 cost drivers (hero section)
+        "top_drivers": drivers,
+
+        # Spike details
+        "spike": {
+            "detected": spike["spike_detected"],
+            "insufficient_data": spike["insufficient_data"],
+            "reason": spike["reason"],
+            "overall_change_pct": spike["overall_change_pct"],
+            "magnitude": spike.get("spike_magnitude"),
+            "affected_services": spike["affected_services"],
+            "affected_regions": spike["affected_regions"],
+        },
+
+        # Waste signals
+        "waste_signals": waste,
+
+        # Actionable suggestions
+        "suggestions": sugg,
+
+        # Chart data
+        "charts": {
+            "top_services": breakdown["top_services"],
+            "daily_trend": breakdown["daily_trend"],
+            "region_breakdown": breakdown["region_breakdown"],
+        },
+
+        # Metadata
+        "meta": {
+            "days_analyzed": days_count,
+            "date_range": parsed["date_range"],
+            "services_found": parsed["services"],
+            "regions_found": parsed["regions"],
+            "parse_warnings": parsed.get("errors", []),
+        },
+    }

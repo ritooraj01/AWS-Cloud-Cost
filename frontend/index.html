@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>☁️ Cloud Cost Panic Button</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <!-- Chart.js for visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="logo">☁️ <span>Cloud Cost</span> Panic Button</div>
+      <p class="tagline">Explain your AWS bill like you're 5 — upload a CSV, get instant plain-English insights.</p>
+    </div>
+  </header>
+
+  <!-- ===================== UPLOAD SECTION ===================== -->
+  <main id="app">
+    <section id="upload-section" class="card upload-card">
+      <h2>📂 Upload Your AWS Billing CSV</h2>
+      <p class="hint">Supports AWS Cost &amp; Usage Report (CUR) or standard billing exports.</p>
+
+      <div class="drop-zone" id="drop-zone">
+        <span class="drop-icon">📄</span>
+        <p>Drag &amp; drop your CSV here, or</p>
+        <label class="btn btn-primary" for="csv-input">Choose File</label>
+        <input type="file" id="csv-input" accept=".csv" hidden />
+        <p class="file-name" id="file-name">No file selected</p>
+      </div>
+
+      <button class="btn btn-danger" id="analyze-btn" disabled>🚨 Analyze My Bill</button>
+
+      <div class="upload-hint">
+        <strong>Don't have a CSV?</strong>
+        <a href="/static/sample_bill.csv" download>Download sample AWS billing CSV</a>
+      </div>
+
+      <div id="upload-error" class="error-banner hidden"></div>
+      <div id="upload-spinner" class="spinner hidden">
+        <div class="spinner-ring"></div>
+        <p>Analyzing your bill…</p>
+      </div>
+    </section>
+
+    <!-- ===================== RESULTS (hidden until analysis) ===================== -->
+    <section id="results-section" class="hidden">
+
+      <!-- ① SUMMARY CARD -->
+      <section class="card summary-card" id="summary-card">
+        <div class="summary-grid">
+          <div class="summary-item">
+            <span class="summary-label">Last 7 days</span>
+            <span class="summary-value" id="s-last7">—</span>
+          </div>
+          <div class="summary-item summary-divider">
+            <span class="summary-label">Previous 7 days</span>
+            <span class="summary-value" id="s-prev7">—</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Change</span>
+            <span class="summary-value badge" id="s-change">—</span>
+          </div>
+          <div class="summary-item summary-divider">
+            <span class="summary-label">Potential Savings</span>
+            <span class="summary-value savings-value" id="s-savings">—</span>
+          </div>
+        </div>
+        <p id="s-narrative" class="summary-narrative"></p>
+      </section>
+
+      <!-- ② TOP 3 COST DRIVERS (HERO) -->
+      <section class="card drivers-card" id="drivers-section">
+        <h2>🔥 Top 3 Reasons Your Bill Changed</h2>
+        <p class="section-hint">Ranked by biggest money impact first.</p>
+        <div id="drivers-list" class="drivers-grid"></div>
+      </section>
+
+      <!-- ③ ACTIONABLE SUGGESTIONS -->
+      <section class="card suggestions-card" id="suggestions-section">
+        <h2>💡 What You Can Do Right Now</h2>
+        <p class="section-hint">Conservative estimates — potential savings, not guaranteed.</p>
+        <div id="suggestions-list"></div>
+      </section>
+
+      <!-- ④ CHARTS & DETAILS (collapsible) -->
+      <section class="card charts-card">
+        <button class="collapsible-toggle" id="charts-toggle">
+          📊 Detailed Charts &amp; Breakdown <span class="toggle-arrow">▼</span>
+        </button>
+        <div id="charts-content" class="collapsible-body">
+
+          <div class="charts-grid">
+            <!-- Top services bar chart -->
+            <div class="chart-box">
+              <h3>Top Services by Cost</h3>
+              <canvas id="chart-services"></canvas>
+            </div>
+            <!-- Daily trend line chart -->
+            <div class="chart-box">
+              <h3>Daily Cost Trend</h3>
+              <canvas id="chart-trend"></canvas>
+            </div>
+            <!-- Region pie chart -->
+            <div class="chart-box">
+              <h3>Regional Breakdown</h3>
+              <canvas id="chart-regions"></canvas>
+            </div>
+          </div>
+
+          <!-- Spike & waste detail -->
+          <div id="spike-detail"></div>
+          <div id="waste-signals" class="waste-section"></div>
+
+        </div>
+      </section>
+
+      <!-- Reset -->
+      <div class="reset-row">
+        <button class="btn btn-outline" id="reset-btn">⬆️ Upload Another CSV</button>
+      </div>
+
+    </section><!-- /results-section -->
+  </main>
+
+  <footer class="site-footer">
+    <p>Built with ☕ · Cloud Cost Panic Button · <em>Explain your bill, not just your budget.</em></p>
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
