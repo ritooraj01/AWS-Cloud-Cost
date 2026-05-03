@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -18,6 +19,17 @@ app = FastAPI(
     title="Cloud Cost Panic Button",
     description="Explain your AWS bill in plain English.",
     version="1.0.0",
+)
+
+# ---------------------------------------------------------------------------
+# CORS — required for GitHub Pages frontend calling Render backend
+# ---------------------------------------------------------------------------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],   # restrict to your GitHub Pages domain after launch
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # In-memory session store: { session_id: insights_payload }

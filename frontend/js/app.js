@@ -2,6 +2,12 @@
    Cloud Cost Panic Button — Frontend Logic
    =================================================== */
 
+// ---- Backend URL config -----------------------------------------------
+// LOCAL DEV:  leave as empty string (uses relative paths, works with uvicorn)
+// PRODUCTION: set to your Render backend URL, e.g.:
+//   const BACKEND_URL = "https://cloud-cost-panic-button.onrender.com";
+const BACKEND_URL = window.BACKEND_URL || "";
+
 // ---- DOM refs -------------------------------------------------------
 const csvInput    = document.getElementById("csv-input");
 const fileNameEl  = document.getElementById("file-name");
@@ -70,14 +76,14 @@ async function uploadAndAnalyze(file) {
 
   try {
     // Step 1: Upload
-    const uploadRes = await fetch("/upload", { method: "POST", body: formData });
+    const uploadRes = await fetch(`${BACKEND_URL}/upload`, { method: "POST", body: formData });
     const uploadJson = await uploadRes.json();
     if (!uploadRes.ok) {
       throw new Error(uploadJson.detail || "Upload failed.");
     }
 
     // Step 2: Fetch analysis
-    const analysisRes = await fetch(`/analysis/${uploadJson.session_id}`);
+    const analysisRes = await fetch(`${BACKEND_URL}/analysis/${uploadJson.session_id}`);
     const data = await analysisRes.json();
     if (!analysisRes.ok) {
       throw new Error(data.detail || "Analysis failed.");
