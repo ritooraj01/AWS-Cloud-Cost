@@ -352,10 +352,15 @@ function renderCharts(chartData) {
   }
 }
 
-// Scale cost values to INR if they look USD-scale (all values < 500 total)
+// Scale cost values to INR.
+// Heuristic: compute average daily cost per service. Real INR bills will
+// have values in hundreds per day; USD bills typically < $10/service/day.
 function scaleInr(amount, chartData) {
-  const total = chartData.top_services?.reduce((a, b) => a + b.total_cost, 0) || 0;
-  return total < 500 ? Math.round(amount * 83) : Math.round(amount);
+  const total  = chartData.top_services?.reduce((a, b) => a + b.total_cost, 0) || 0;
+  const days   = chartData.daily_trend?.length || 14;
+  const svcs   = chartData.top_services?.length || 1;
+  const avgDailyPerSvc = total / days / svcs;
+  return avgDailyPerSvc < 10 ? Math.round(amount * 83) : Math.round(amount);
 }
 
 function destroyCharts() {

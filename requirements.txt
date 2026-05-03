@@ -1,5 +1,5 @@
-fastapi==0.115.12
-uvicorn[standard]==0.34.0
-pandas==2.2.3
-numpy==2.2.5
-python-multipart==0.0.20
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pandas>=2.2
+numpy>=1.26
+python-multipart>=0.0.9

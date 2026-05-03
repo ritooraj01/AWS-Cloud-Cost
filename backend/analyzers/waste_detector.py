@@ -15,9 +15,10 @@ from collections import defaultdict
 # Coefficient of variation threshold below which cost is "suspiciously flat"
 FLAT_COST_CV_THRESHOLD = 0.05   # < 5% variation = flat
 MIN_DAYS_FOR_FLAT = 7
-DATA_TRANSFER_SERVICES = {"AWSDataTransfer", "DataTransfer", "AWS Data Transfer"}
-EC2_SERVICES = {"AmazonEC2", "EC2", "Amazon EC2"}
-EBS_KEYWORDS = {"EBS", "AmazonEBS", "Amazon Elastic Block Store"}
+# Match the SHORTENED names produced by aws_parser._shorten_service()
+DATA_TRANSFER_SERVICES = {"Data Transfer", "AWSDataTransfer", "DataTransfer", "AWS Data Transfer"}
+EC2_SERVICES = {"Amazon EC2", "AmazonEC2", "EC2"}
+EBS_KEYWORDS = {"Amazon EBS", "EBS", "AmazonEBS", "Amazon Elastic Block Store"}
 CONCENTRATION_THRESHOLD = 0.70  # 70% cost in one region
 
 

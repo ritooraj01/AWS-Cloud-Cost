@@ -55,6 +55,8 @@ async def upload_csv(file: UploadFile = File(...)):
     content = await file.read()
     if len(content) == 0:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    if len(content) > 50 * 1024 * 1024:  # 50 MB hard limit
+        raise HTTPException(status_code=413, detail="File too large. Maximum size is 50 MB.")
 
     try:
         parsed = aws_parser.parse(content)
