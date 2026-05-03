@@ -209,6 +209,8 @@ body {
 
 /* ---- FOOTER ---- */
 .site-footer { text-align: center; padding: 1.5rem; color: var(--muted); font-size: 0.82rem; border-top: 1px solid var(--border); }
+.site-footer a { color: var(--accent); text-decoration: none; }
+.site-footer a:hover { text-decoration: underline; }
 
 /* ---- UTILITY ---- */
 .hidden { display: none !important; }
