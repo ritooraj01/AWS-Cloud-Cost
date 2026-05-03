@@ -6,7 +6,7 @@
 // LOCAL DEV:  leave as empty string (uses relative paths, works with uvicorn)
 // PRODUCTION: set to your Render backend URL, e.g.:
 //   const BACKEND_URL = "https://cloud-cost-panic-button.onrender.com";
-const BACKEND_URL = window.BACKEND_URL || "";
+const BACKEND_URL = window.BACKEND_URL || "https://aws-cloud-cost.onrender.com";
 
 // ---- DOM refs -------------------------------------------------------
 const csvInput    = document.getElementById("csv-input");
