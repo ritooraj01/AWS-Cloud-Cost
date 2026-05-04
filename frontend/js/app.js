@@ -10,9 +10,14 @@ const BACKEND_URL = window.BACKEND_URL || "https://aws-cloud-cost.onrender.com";
 
 // ---- DOM refs -------------------------------------------------------
 const csvInput    = document.getElementById("csv-input");
+const csvInput2   = document.getElementById("csv-input-2");
 const fileNameEl  = document.getElementById("file-name");
+const fileNameEl2 = document.getElementById("file-name-2");
 const analyzeBtn  = document.getElementById("analyze-btn");
 const dropZone    = document.getElementById("drop-zone");
+const dropZone2   = document.getElementById("drop-zone-2");
+const compareCheck = document.getElementById("compare-check");
+const compareZone  = document.getElementById("compare-zone");
 const uploadError = document.getElementById("upload-error");
 const spinner     = document.getElementById("upload-spinner");
 const uploadSec   = document.getElementById("upload-section");
@@ -23,20 +28,49 @@ const chartsToggle = document.getElementById("charts-toggle");
 const chartsBody   = document.getElementById("charts-content");
 
 let selectedFile   = null;
-let charts         = {};       // chart instances for destroy-on-reload
-let _lastPayload   = null;    // stored for report download
+let selectedFile2  = null;
+let charts         = {};
+let _lastPayload   = null;
+
+// ---- Compare mode toggle --------------------------------------------
+compareCheck.addEventListener("change", () => {
+  compareZone.classList.toggle("hidden", !compareCheck.checked);
+  if (!compareCheck.checked) {
+    selectedFile2 = null;
+    if (fileNameEl2) fileNameEl2.textContent = "No file selected";
+    if (csvInput2) csvInput2.value = "";
+  }
+  updateAnalyzeBtn();
+});
+
+function updateAnalyzeBtn() {
+  const needsSecond = compareCheck.checked;
+  analyzeBtn.disabled = !selectedFile || (needsSecond && !selectedFile2);
+}
 
 // ---- File selection via input or drag-drop --------------------------
-csvInput.addEventListener("change", () => handleFile(csvInput.files[0]));
+csvInput.addEventListener("change", () => handleFile(csvInput.files[0], 1));
+if (csvInput2) csvInput2.addEventListener("change", () => handleFile(csvInput2.files[0], 2));
 
 dropZone.addEventListener("click", (e) => {
-  // The <label for="csv-input"> already opens the dialog natively.
-  // Only trigger manually when the click landed directly on the drop zone
-  // background — not on the label, button, or the input itself.
   if (e.target === dropZone || e.target.tagName === "P" || e.target.tagName === "SPAN") {
     csvInput.click();
   }
 });
+if (dropZone2) {
+  dropZone2.addEventListener("click", (e) => {
+    if (e.target === dropZone2 || e.target.tagName === "P" || e.target.tagName === "SPAN") {
+      csvInput2.click();
+    }
+  });
+  dropZone2.addEventListener("dragover",  (e) => { e.preventDefault(); dropZone2.classList.add("dragover"); });
+  dropZone2.addEventListener("dragleave", ()  => dropZone2.classList.remove("dragover"));
+  dropZone2.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropZone2.classList.remove("dragover");
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0], 2);
+  });
+}
 
 dropZone.addEventListener("dragover", (e) => {
   e.preventDefault();
@@ -47,25 +81,34 @@ dropZone.addEventListener("drop", (e) => {
   e.preventDefault();
   dropZone.classList.remove("dragover");
   const f = e.dataTransfer.files[0];
-  if (f) handleFile(f);
+  if (f) handleFile(f, 1);
 });
 
-function handleFile(file) {
+function handleFile(file, slot = 1) {
   if (!file) return;
   if (!file.name.endsWith(".csv")) {
     showError("Please upload a .csv file.");
     return;
   }
-  selectedFile = file;
-  fileNameEl.textContent = file.name;
-  analyzeBtn.disabled = false;
+  if (slot === 1) {
+    selectedFile = file;
+    fileNameEl.textContent = file.name;
+  } else {
+    selectedFile2 = file;
+    if (fileNameEl2) fileNameEl2.textContent = file.name;
+  }
+  updateAnalyzeBtn();
   hideError();
 }
 
 // ---- Analyze button -------------------------------------------------
 analyzeBtn.addEventListener("click", async () => {
   if (!selectedFile) return;
-  await uploadAndAnalyze(selectedFile);
+  if (compareCheck.checked && selectedFile2) {
+    await uploadAndCompare(selectedFile, selectedFile2);
+  } else {
+    await uploadAndAnalyze(selectedFile);
+  }
 });
 
 async function uploadAndAnalyze(file) {
@@ -77,19 +120,40 @@ async function uploadAndAnalyze(file) {
   formData.append("file", file);
 
   try {
-    // Step 1: Upload
     const uploadRes = await fetch(`${BACKEND_URL}/upload`, { method: "POST", body: formData });
     const uploadJson = await uploadRes.json();
-    if (!uploadRes.ok) {
-      throw new Error(uploadJson.detail || "Upload failed.");
-    }
+    if (!uploadRes.ok) throw new Error(uploadJson.detail || "Upload failed.");
 
-    // Step 2: Fetch analysis
     const analysisRes = await fetch(`${BACKEND_URL}/analysis/${uploadJson.session_id}`);
     const data = await analysisRes.json();
-    if (!analysisRes.ok) {
-      throw new Error(data.detail || "Analysis failed.");
-    }
+    if (!analysisRes.ok) throw new Error(data.detail || "Analysis failed.");
+
+    renderResults(data);
+  } catch (err) {
+    showError(err.message);
+    analyzeBtn.disabled = false;
+  } finally {
+    showSpinner(false);
+  }
+}
+
+async function uploadAndCompare(file1, file2) {
+  hideError();
+  showSpinner(true);
+  analyzeBtn.disabled = true;
+
+  const formData = new FormData();
+  formData.append("file1", file1);
+  formData.append("file2", file2);
+
+  try {
+    const uploadRes = await fetch(`${BACKEND_URL}/upload-multi`, { method: "POST", body: formData });
+    const uploadJson = await uploadRes.json();
+    if (!uploadRes.ok) throw new Error(uploadJson.detail || "Upload failed.");
+
+    const analysisRes = await fetch(`${BACKEND_URL}/analysis/${uploadJson.session_id}`);
+    const data = await analysisRes.json();
+    if (!analysisRes.ok) throw new Error(data.detail || "Analysis failed.");
 
     renderResults(data);
   } catch (err) {
@@ -105,9 +169,14 @@ resetBtn.addEventListener("click", () => {
   resultsSec.classList.add("hidden");
   uploadSec.classList.remove("hidden");
   selectedFile = null;
+  selectedFile2 = null;
   fileNameEl.textContent = "No file selected";
+  if (fileNameEl2) fileNameEl2.textContent = "No file selected";
   analyzeBtn.disabled = true;
   csvInput.value = "";
+  if (csvInput2) csvInput2.value = "";
+  compareCheck.checked = false;
+  compareZone.classList.add("hidden");
   if (downloadBtn) downloadBtn.style.display = "none";
   _lastPayload = null;
   destroyCharts();

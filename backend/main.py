@@ -93,6 +93,65 @@ async def upload_csv(file: UploadFile = File(...)):
     return JSONResponse({"session_id": session_id, "status": "ok"})
 
 
+@app.post("/upload-multi")
+async def upload_multi_csv(
+    file1: UploadFile = File(...),
+    file2: UploadFile = File(...),
+):
+    """
+    Accept two billing CSVs (e.g. current + previous month) for side-by-side
+    comparison.  Merges records from both files; the breakdown analyzer
+    automatically splits them by calendar month.
+    """
+    parsed_list = []
+    for f in (file1, file2):
+        if not f.filename.endswith(".csv"):
+            raise HTTPException(status_code=400, detail="Only .csv files are supported.")
+        content = await f.read()
+        if len(content) == 0:
+            raise HTTPException(status_code=400, detail=f"{f.filename} is empty.")
+        if len(content) > 50 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail=f"{f.filename} exceeds 50 MB limit.")
+        try:
+            parsed_list.append(aws_parser.parse(content))
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=f"{f.filename}: {exc}")
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Parse error in {f.filename}: {exc}")
+
+    # Sort so the older file is first
+    parsed_list.sort(key=lambda p: p["date_range"]["start"])
+    older, newer = parsed_list[0], parsed_list[1]
+
+    merged = {
+        "records":    older["records"] + newer["records"],
+        "days_count": older["days_count"] + newer["days_count"],
+        "date_range": {
+            "start": older["date_range"]["start"],
+            "end":   newer["date_range"]["end"],
+        },
+        "services": sorted(set(older["services"] + newer["services"])),
+        "regions":  sorted(set(older["regions"]  + newer["regions"])),
+        "errors":   older["errors"] + newer["errors"],
+        "format":   newer["format"],
+        "currency": newer["currency"],
+    }
+
+    try:
+        payload = insights_engine.generate(merged)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Analysis error: {exc}")
+
+    session_id = str(uuid.uuid4())
+    _sessions[session_id] = payload
+
+    if len(_sessions) > 100:
+        oldest = next(iter(_sessions))
+        del _sessions[oldest]
+
+    return JSONResponse({"session_id": session_id, "status": "ok", "mode": "comparison"})
+
+
 @app.get("/analysis/{session_id}")
 async def get_analysis(session_id: str):
     """Return full insights payload for a session."""

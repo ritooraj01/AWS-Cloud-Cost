@@ -32,6 +32,15 @@ def generate(parsed: dict) -> dict:
     period_label = breakdown["period_label"]
     prev_period_label = breakdown["prev_period_label"]
 
+    # ---- For monthly / single-period data, spike detection is not meaningful
+    if period_type in ("monthly", "single") and not spike.get("spike_detected"):
+        spike["insufficient_data"] = True
+        spike["reason"] = (
+            f"Spike detection requires daily-granularity data (7+ days). "
+            f"Your CSV contains {period_label} monthly totals. "
+            f"Upload a daily export or use multi-month comparison to enable this."
+        )
+
     # ---- Translate to human language ------------------------------------
     summary_human = translator.translate_summary(
         period, total_cost, currency, period_label, prev_period_label

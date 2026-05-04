@@ -4,11 +4,11 @@ Produces:
   - Top 5 services by total cost
   - Daily cost trend (last 14 days)
   - Region-wise cost distribution
-  - Before/After 7-day split totals + averages
+  - Period comparison (last vs previous period, with smart detection)
 """
 
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime as _dt
 
 
 def analyze(records: list[dict]) -> dict:
@@ -57,46 +57,78 @@ def analyze(records: list[dict]) -> dict:
         reverse=True,
     )
 
-    # ---- Before / After 7-day split -------------------------------------
+    # ---- Before / After period split  ------------------------------------
     all_dates = sorted(daily_totals.keys())
-    last_7_dates = all_dates[-7:] if len(all_dates) >= 7 else all_dates
-    prev_7_dates = (
-        all_dates[-14:-7] if len(all_dates) >= 14 else all_dates[: max(0, len(all_dates) - 7)]
-    )
 
-    last_7_total = sum(daily_totals[d] for d in last_7_dates)
-    prev_7_total = sum(daily_totals[d] for d in prev_7_dates)
-    last_7_avg = last_7_total / len(last_7_dates) if last_7_dates else 0
-    prev_7_avg = prev_7_total / len(prev_7_dates) if prev_7_dates else 0
+    # Compute date span to drive period detection
+    if all_dates:
+        first_dt = _dt.strptime(all_dates[0], "%Y-%m-%d")
+        last_dt  = _dt.strptime(all_dates[-1], "%Y-%m-%d")
+        date_span_days = (last_dt - first_dt).days
+    else:
+        date_span_days = 0
 
+    months_present = sorted(set(d[:7] for d in all_dates))  # ["2026-03", "2026-04"]
+
+    if date_span_days >= 45 and len(months_present) >= 2:
+        # ── Two-month comparison (multi-CSV upload)
+        period_type  = "comparison"
+        last_m_pfx   = months_present[-1]
+        prev_m_pfx   = months_present[-2]
+        last_period_dates = [d for d in all_dates if d.startswith(last_m_pfx)]
+        prev_period_dates = [d for d in all_dates if d.startswith(prev_m_pfx)]
+        period_label      = _dt.strptime(last_m_pfx + "-01", "%Y-%m-%d").strftime("%B %Y")
+        prev_period_label = _dt.strptime(prev_m_pfx + "-01", "%Y-%m-%d").strftime("%B %Y")
+
+    elif date_span_days >= 20 or (len(all_dates) <= 5 and date_span_days >= 5):
+        # ── Single-month summary (usage_type or wide monthly export)
+        period_type  = "monthly"
+        last_period_dates = all_dates
+        prev_period_dates = []
+        period_label = (
+            _dt.strptime(all_dates[-1], "%Y-%m-%d").strftime("%B %Y")
+            if all_dates else "This Month"
+        )
+        prev_period_label = "Previous Month"
+
+    elif len(all_dates) >= 7:
+        # ── Daily granularity
+        period_type       = "daily"
+        last_period_dates = all_dates[-7:]
+        prev_period_dates = (
+            all_dates[-14:-7] if len(all_dates) >= 14 else all_dates[: max(0, len(all_dates) - 7)]
+        )
+        period_label      = "Last 7 Days"
+        prev_period_label = "Previous 7 Days"
+
+    else:
+        # ── Insufficient data – treat as single period
+        period_type       = "single"
+        last_period_dates = all_dates
+        prev_period_dates = []
+        period_label = (
+            _dt.strptime(all_dates[-1], "%Y-%m-%d").strftime("%B %Y")
+            if all_dates else "This Period"
+        )
+        prev_period_label = "Previous Period"
+
+    last_7_total = sum(daily_totals[d] for d in last_period_dates)
+    prev_7_total = sum(daily_totals[d] for d in prev_period_dates)
+    last_7_avg   = last_7_total / len(last_period_dates) if last_period_dates else 0
+    prev_7_avg   = prev_7_total / len(prev_period_dates) if prev_period_dates else 0
     if prev_7_total > 0:
         change_pct = round(((last_7_total - prev_7_total) / prev_7_total) * 100, 1)
     else:
         change_pct = 0.0
 
-    # ---- Detect data granularity ----------------------------------------
-    # ≤ 3 distinct dates → monthly snapshots; more → daily granularity
-    if len(all_dates) == 1:
-        period_type = "single"        # exactly one month / one day in CSV
-        period_label = "This Period"
-        prev_period_label = "Previous Period"
-    elif len(all_dates) <= 3:
-        period_type = "monthly"
-        period_label = "This Month"
-        prev_period_label = "Previous Month"
-    else:
-        period_type = "daily"
-        period_label = "Last 7 Days"
-        prev_period_label = "Previous 7 Days"
-
     period_comparison = {
         "last_7_days": {
-            "dates": last_7_dates,
+            "dates": last_period_dates,
             "total": round(last_7_total, 2),
             "daily_avg": round(last_7_avg, 2),
         },
         "previous_7_days": {
-            "dates": prev_7_dates,
+            "dates": prev_period_dates,
             "total": round(prev_7_total, 2),
             "daily_avg": round(prev_7_avg, 2),
         },

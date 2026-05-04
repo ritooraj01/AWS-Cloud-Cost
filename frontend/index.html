@@ -28,14 +28,35 @@
   <main id="app">
     <section id="upload-section" class="card upload-card">
       <h2>📂 Upload Your AWS Billing CSV</h2>
-      <p class="hint">Supports AWS Cost &amp; Usage Report (CUR) or standard billing exports.</p>
+      <p class="hint">Supports AWS Cost &amp; Usage Report (CUR), service billing exports, or usage-type exports.</p>
 
+      <!-- Primary file picker -->
       <div class="drop-zone" id="drop-zone">
         <span class="drop-icon">📄</span>
         <p>Drag &amp; drop your CSV here, or</p>
         <label class="btn btn-primary" for="csv-input">Choose File</label>
         <input type="file" id="csv-input" accept=".csv" hidden />
         <p class="file-name" id="file-name">No file selected</p>
+      </div>
+
+      <!-- Compare toggle -->
+      <div class="compare-toggle-row">
+        <label class="compare-check-label">
+          <input type="checkbox" id="compare-check" />
+          📊 Compare with a previous period
+        </label>
+      </div>
+
+      <!-- Secondary file picker (hidden until toggle is checked) -->
+      <div id="compare-zone" class="hidden">
+        <p class="compare-zone-label">Previous period CSV (e.g. last month):</p>
+        <div class="drop-zone drop-zone-secondary" id="drop-zone-2">
+          <span class="drop-icon" style="font-size:1.4rem">📄</span>
+          <p>Drag &amp; drop, or</p>
+          <label class="btn btn-primary btn-sm" for="csv-input-2">Choose File</label>
+          <input type="file" id="csv-input-2" accept=".csv" hidden />
+          <p class="file-name" id="file-name-2">No file selected</p>
+        </div>
       </div>
 
       <button class="btn btn-danger" id="analyze-btn" disabled>🚨 Analyze My Bill</button>

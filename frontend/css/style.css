@@ -74,6 +74,24 @@ body {
 .upload-hint a { color: var(--blue); text-decoration: none; }
 .upload-hint a:hover { text-decoration: underline; }
 
+/* ---- Compare toggle ---- */
+.compare-toggle-row { margin: 0.5rem 0 0.25rem; }
+.compare-check-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+.compare-check-label input[type="checkbox"] { width: 1rem; height: 1rem; cursor: pointer; }
+#compare-zone { margin-top: 0.75rem; }
+.compare-zone-label { font-size: 0.85rem; color: var(--muted); margin-bottom: 0.5rem; }
+.drop-zone-secondary { padding: 1rem; }
+.drop-zone-secondary .drop-icon { font-size: 1.4rem; }
+.btn-sm { padding: 0.35rem 0.9rem; font-size: 0.82rem; }
+
 /* ---- BUTTONS ---- */
 .btn {
   display: inline-block;
