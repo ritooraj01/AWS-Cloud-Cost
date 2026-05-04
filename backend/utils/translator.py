@@ -2,40 +2,60 @@
 Human Language Translator
 Converts raw analysis data into plain English sentences.
 Target tone: direct, clear, actionable — "explain like I'm 5."
-All amounts in INR (₹). 1 USD ≈ 93 INR conversion applied if costs look USD-scale.
+All amounts displayed in INR (₹). USD is converted at 1 USD = 83 INR.
 """
 
-# Rough conversion: if costs look like USD values (< 500 total),
-# multiply by this factor for display.  Can be disabled/overridden.
-USD_TO_INR = 93.0
+USD_TO_INR = 83.0
 
 
-def _maybe_inr(amount: float, total_cost: float) -> float:
-    """If total_cost looks like USD scale, multiply by USD_TO_INR."""
-    if total_cost < 500:
+def _to_inr(amount: float, currency: str = "USD") -> float:
+    """Convert an amount to INR. Always converts USD at fixed rate."""
+    if currency == "USD":
         return amount * USD_TO_INR
     return amount
 
 
-def translate_summary(period_comparison: dict, total_cost: float) -> dict:
+def translate_summary(
+    period_comparison: dict,
+    total_cost: float,
+    currency: str = "USD",
+    period_label: str = "Last 7 Days",
+    prev_period_label: str = "Previous 7 Days",
+) -> dict:
     """
     Produce human-readable summary sentences + formatted display values.
     """
-    last7 = _maybe_inr(period_comparison["last_7_days"]["total"], total_cost)
-    prev7 = _maybe_inr(period_comparison["previous_7_days"]["total"], total_cost)
+    last7_raw = period_comparison["last_7_days"]["total"]
+    prev7_raw = period_comparison["previous_7_days"]["total"]
     change_pct = period_comparison["change_percentage"]
-    change_amt = _maybe_inr(abs(period_comparison["change_amount"]), total_cost)
 
-    if change_pct > 0:
-        trend_text = f"Your cloud spend went UP ₹{change_amt:,.0f} compared to last week (+{change_pct:.0f}%)."
+    last7 = _to_inr(last7_raw, currency)
+    prev7 = _to_inr(prev7_raw, currency)
+    change_amt = _to_inr(abs(period_comparison["change_amount"]), currency)
+
+    no_prev_data = prev7_raw == 0 and last7_raw > 0
+
+    if no_prev_data:
+        # Single period — no comparison available
+        usd_note = f" (~${last7_raw:,.2f})" if currency == "USD" else ""
+        trend_text = (
+            f"Your AWS bill for this period is ₹{last7:,.0f}{usd_note}. "
+            f"No previous period data is available for comparison."
+        )
+        trend_emoji = "🟡"
+        trend_label = "N/A"
+        change_pct = 0.0
+        change_amt = 0.0
+    elif change_pct > 0:
+        trend_text = f"Your cloud spend went UP ₹{change_amt:,.0f} compared to the previous period (+{change_pct:.0f}%)."
         trend_emoji = "🔴"
         trend_label = f"+{change_pct:.0f}%"
     elif change_pct < 0:
-        trend_text = f"Your cloud spend went DOWN ₹{change_amt:,.0f} compared to last week ({change_pct:.0f}%)."
+        trend_text = f"Your cloud spend went DOWN ₹{change_amt:,.0f} compared to the previous period ({change_pct:.0f}%)."
         trend_emoji = "🟢"
         trend_label = f"{change_pct:.0f}%"
     else:
-        trend_text = "Your cloud spend is stable compared to last week."
+        trend_text = "Your cloud spend is stable compared to the previous period."
         trend_emoji = "🟡"
         trend_label = "~0%"
 
@@ -47,17 +67,24 @@ def translate_summary(period_comparison: dict, total_cost: float) -> dict:
         "trend_emoji": trend_emoji,
         "trend_label": trend_label,
         "narrative": trend_text,
+        "period_label": period_label,
+        "prev_period_label": prev_period_label,
     }
 
 
-def translate_driver(driver: dict, total_cost: float) -> str:
+def translate_driver(driver: dict, total_cost: float, currency: str = "USD") -> str:
     """Convert a cost driver dict to a plain English sentence."""
     svc = driver["service"]
-    amt = _maybe_inr(driver["impact_amount"], total_cost)
+    amt = _to_inr(driver["impact_amount"], currency)
     pct = driver["impact_percentage"]
     cat = driver["category"]
 
-    if cat == "new_service":
+    if cat == "high_spender":
+        return (
+            f"{svc} is your #{driver.get('rank', '')} biggest cost at ₹{amt:,.0f} "
+            f"({pct:.0f}% of your total bill)."
+        )
+    elif cat == "new_service":
         return (
             f"A new AWS service appeared on your bill: {svc} cost ₹{amt:,.0f} "
             f"this week — it wasn't there before."
@@ -75,10 +102,10 @@ def translate_driver(driver: dict, total_cost: float) -> str:
     return driver.get("description", "")
 
 
-def translate_waste_signal(signal: dict, total_cost: float) -> str:
+def translate_waste_signal(signal: dict, total_cost: float, currency: str = "USD") -> str:
     """Convert a waste signal to a plain English insight."""
     sig_type = signal["signal_type"]
-    savings = _maybe_inr(signal["potential_savings_inr"], total_cost)
+    savings = _to_inr(signal["potential_savings_inr"], currency)
 
     if sig_type == "constant_cost":
         svc = signal["services_involved"][0] if signal["services_involved"] else "A service"
@@ -105,9 +132,9 @@ def translate_waste_signal(signal: dict, total_cost: float) -> str:
     return signal.get("description", "")
 
 
-def translate_suggestion(suggestion: dict, total_cost: float) -> str:
+def translate_suggestion(suggestion: dict, total_cost: float, currency: str = "USD") -> str:
     """Convert a suggestion to a plain English action sentence."""
-    savings = _maybe_inr(suggestion.get("savings_inr", 0), total_cost)
+    savings = _to_inr(suggestion.get("savings_inr", 0), currency)
     action = suggestion.get("action", "Review this resource")
     confidence = suggestion.get("confidence", "MEDIUM")
     conf_text = {"HIGH": "very likely", "MEDIUM": "possibly", "LOW": "potentially"}.get(confidence, "possibly")

@@ -128,7 +128,7 @@ function renderResults(data) {
   renderSuggestions(suggestions);
   renderSpikeDetail(spike);
   renderWasteSignals(waste_signals);
-  renderCharts(chartData);
+  renderCharts(chartData, meta.currency);
 
   uploadSec.classList.add("hidden");
   resultsSec.classList.remove("hidden");
@@ -137,8 +137,15 @@ function renderResults(data) {
 
 // ---- ① Summary Card -------------------------------------------------
 function renderSummaryCard(s) {
+  // Update period labels dynamically based on data type
+  const labelCurrent = document.getElementById("s-label-current");
+  const labelPrev    = document.getElementById("s-label-prev");
+  if (labelCurrent) labelCurrent.textContent = s.period_label || "This Period";
+  if (labelPrev)    labelPrev.textContent    = s.prev_period_label || "Previous Period";
+
   document.getElementById("s-last7").textContent = `₹${fmt(s.last_7_days_inr)}`;
-  document.getElementById("s-prev7").textContent = `₹${fmt(s.previous_7_days_inr)}`;
+  document.getElementById("s-prev7").textContent =
+    s.previous_7_days_inr > 0 ? `₹${fmt(s.previous_7_days_inr)}` : "N/A";
 
   const changeEl = document.getElementById("s-change");
   const pct = s.change_pct;
@@ -165,11 +172,16 @@ function renderDrivers(drivers, last7Total) {
 
   drivers.forEach((d) => {
     const isNew = d.category === "new_service";
-    const impactLabel = isNew
-      ? `₹${fmt(d.impact_amount)} new`
+    const isHighSpender = d.category === "high_spender";
+    // impact_amount is in original currency (USD) — display as ₹ using *83 conversion
+    const inrAmt = Math.round(d.impact_amount * 83);
+    const impactLabel = isHighSpender
+      ? `₹${fmt(inrAmt)}`
+      : isNew
+      ? `₹${fmt(inrAmt)} new`
       : d.impact_amount > 0
-      ? `+₹${fmt(d.impact_amount)}`
-      : `₹${fmt(d.impact_amount)}`;
+      ? `+₹${fmt(inrAmt)}`
+      : `₹${fmt(inrAmt)}`;
 
     const confClass = { HIGH: "conf-high", MEDIUM: "conf-medium", LOW: "conf-low" }[d.confidence] || "";
     const rankEmoji = ["🥇", "🥈", "🥉"][d.rank - 1] || "📌";
@@ -284,7 +296,7 @@ function renderWasteSignals(signals) {
 }
 
 // ---- Charts ---------------------------------------------------------
-function renderCharts(chartData) {
+function renderCharts(chartData, currency) {
   // Charts are inside collapsible; show toggle arrow default open
   chartsBody.classList.remove("hidden");
   chartsToggle.querySelector(".toggle-arrow").classList.add("open");
@@ -297,7 +309,7 @@ function renderCharts(chartData) {
   const svcCtx = document.getElementById("chart-services")?.getContext("2d");
   if (svcCtx && chartData.top_services?.length) {
     const labels = chartData.top_services.map(s => s.service);
-    const values = chartData.top_services.map(s => scaleInr(s.total_cost, chartData));
+    const values = chartData.top_services.map(s => scaleInr(s.total_cost, chartData, currency));
     charts.services = new Chart(svcCtx, {
       type: "bar",
       data: {
@@ -317,13 +329,13 @@ function renderCharts(chartData) {
   const trendCtx = document.getElementById("chart-trend")?.getContext("2d");
   if (trendCtx && chartData.daily_trend?.length) {
     const labels = chartData.daily_trend.map(d => d.date.slice(5)); // MM-DD
-    const values = chartData.daily_trend.map(d => scaleInr(d.cost, chartData));
+    const values = chartData.daily_trend.map(d => scaleInr(d.cost, chartData, currency));
     charts.trend = new Chart(trendCtx, {
       type: "line",
       data: {
         labels,
         datasets: [{
-          label: "Daily Cost (₹)", data: values,
+          label: "Cost (₹)", data: values,
           borderColor: "#e53e3e", backgroundColor: "rgba(229,62,62,0.08)",
           tension: 0.35, fill: true, pointRadius: 3,
         }],
@@ -340,7 +352,7 @@ function renderCharts(chartData) {
   const regCtx = document.getElementById("chart-regions")?.getContext("2d");
   if (regCtx && chartData.region_breakdown?.length) {
     const labels = chartData.region_breakdown.map(r => r.region);
-    const values = chartData.region_breakdown.map(r => scaleInr(r.total_cost, chartData));
+    const values = chartData.region_breakdown.map(r => scaleInr(r.total_cost, chartData, currency));
     charts.regions = new Chart(regCtx, {
       type: "doughnut",
       data: {
@@ -359,14 +371,13 @@ function renderCharts(chartData) {
 }
 
 // Scale cost values to INR.
-// Heuristic: compute average daily cost per service. Real INR bills will
-// have values in hundreds per day; USD bills typically < $10/service/day.
-function scaleInr(amount, chartData) {
-  const total  = chartData.top_services?.reduce((a, b) => a + b.total_cost, 0) || 0;
-  const days   = chartData.daily_trend?.length || 14;
-  const svcs   = chartData.top_services?.length || 1;
-  const avgDailyPerSvc = total / days / svcs;
-  return avgDailyPerSvc < 10 ? Math.round(amount * 83) : Math.round(amount);
+// Uses meta.currency from the API response when available.
+// Falls back to a heuristic for backward compatibility.
+function scaleInr(amount, chartData, currency) {
+  if (currency === "USD") return Math.round(amount * 83);
+  if (currency && currency !== "INR") return Math.round(amount * 83); // safe default for unknown
+  // INR — no conversion needed
+  return Math.round(amount);
 }
 
 function destroyCharts() {

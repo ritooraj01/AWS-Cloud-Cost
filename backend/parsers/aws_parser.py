@@ -375,6 +375,15 @@ def parse(file_bytes):
     services = sorted(set(r["service"] for r in records))
     regions  = sorted(set(r["region"]  for r in records))
 
+    # ---- Currency detection ---------------------------------------------
+    if fmt == "wide":
+        currency = "USD"  # wide billing format always uses ($) column names
+    elif fmt == "CUR" and "lineItem/CurrencyCode" in df.columns:
+        codes = df["lineItem/CurrencyCode"].dropna().unique().tolist()
+        currency = str(codes[0]) if codes else "USD"
+    else:
+        currency = "USD"  # default assumption for all other formats
+
     return {
         "records":    records,
         "days_count": len(dates),
@@ -383,4 +392,5 @@ def parse(file_bytes):
         "regions":    regions,
         "errors":     errors,
         "format":     fmt,
+        "currency":   currency,
     }

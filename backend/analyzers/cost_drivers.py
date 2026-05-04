@@ -24,7 +24,27 @@ def find(records: list[dict], days_count: int) -> list[dict]:
       }
     """
     if days_count < 7:
-        return []
+        # Fallback: rank top 3 services by absolute spend for single-period data
+        service_totals: dict[str, float] = defaultdict(float)
+        total_spend = 0.0
+        for r in records:
+            service_totals[r["service"]] += r["cost"]
+            total_spend += r["cost"]
+
+        top3 = sorted(service_totals.items(), key=lambda x: x[1], reverse=True)[:3]
+        return [
+            {
+                "rank": rank,
+                "service": svc,
+                "impact_amount": round(cost, 2),
+                "impact_percentage": round((cost / total_spend * 100) if total_spend else 0, 1),
+                "category": "high_spender",
+                "confidence": "HIGH",
+                "description": f"{svc} is your #{rank} biggest cost this period",
+                "region": None,
+            }
+            for rank, (svc, cost) in enumerate(top3, 1)
+        ]
 
     # ---- Build per-service daily costs ----------------------------------
     service_daily: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))

@@ -16,6 +16,7 @@ def generate(parsed: dict) -> dict:
     """
     records = parsed["records"]
     days_count = parsed["days_count"]
+    currency = parsed.get("currency", "USD")
 
     # ---- Run all analyzers ----------------------------------------------
     breakdown = breakdown_analyzer.analyze(records)
@@ -25,18 +26,23 @@ def generate(parsed: dict) -> dict:
 
     total_cost = breakdown["total_cost"]
     period = breakdown["period_comparison"]
+    period_type = breakdown["period_type"]
+    period_label = breakdown["period_label"]
+    prev_period_label = breakdown["prev_period_label"]
 
     # ---- Translate to human language ------------------------------------
-    summary_human = translator.translate_summary(period, total_cost)
+    summary_human = translator.translate_summary(
+        period, total_cost, currency, period_label, prev_period_label
+    )
 
     for d in drivers:
-        d["human_text"] = translator.translate_driver(d, total_cost)
+        d["human_text"] = translator.translate_driver(d, total_cost, currency)
 
     for w in waste:
-        w["human_text"] = translator.translate_waste_signal(w, total_cost)
+        w["human_text"] = translator.translate_waste_signal(w, total_cost, currency)
 
     # ---- Build suggestions ----------------------------------------------
-    sugg = suggestions.build(waste, spike, total_cost)
+    sugg = suggestions.build(waste, spike, total_cost, records=records, currency=currency)
 
     # ---- Compute total potential savings --------------------------------
     total_savings = sum(s["savings_inr"] for s in sugg)
@@ -55,6 +61,8 @@ def generate(parsed: dict) -> dict:
             "total_potential_savings_inr": round(total_savings, 0),
             "spike_detected": spike["spike_detected"],
             "spike_magnitude": spike.get("spike_magnitude"),
+            "period_label": summary_human["period_label"],
+            "prev_period_label": summary_human["prev_period_label"],
         },
 
         # Top 3 cost drivers (hero section)
@@ -91,5 +99,7 @@ def generate(parsed: dict) -> dict:
             "services_found": parsed["services"],
             "regions_found": parsed["regions"],
             "parse_warnings": parsed.get("errors", []),
+            "currency": currency,
+            "period_type": period_type,
         },
     }

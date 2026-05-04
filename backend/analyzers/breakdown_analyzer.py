@@ -74,6 +74,21 @@ def analyze(records: list[dict]) -> dict:
     else:
         change_pct = 0.0
 
+    # ---- Detect data granularity ----------------------------------------
+    # ≤ 3 distinct dates → monthly snapshots; more → daily granularity
+    if len(all_dates) == 1:
+        period_type = "single"        # exactly one month / one day in CSV
+        period_label = "This Period"
+        prev_period_label = "Previous Period"
+    elif len(all_dates) <= 3:
+        period_type = "monthly"
+        period_label = "This Month"
+        prev_period_label = "Previous Month"
+    else:
+        period_type = "daily"
+        period_label = "Last 7 Days"
+        prev_period_label = "Previous 7 Days"
+
     period_comparison = {
         "last_7_days": {
             "dates": last_7_dates,
@@ -95,4 +110,7 @@ def analyze(records: list[dict]) -> dict:
         "daily_trend": daily_trend,
         "region_breakdown": region_breakdown,
         "period_comparison": period_comparison,
+        "period_type": period_type,
+        "period_label": period_label,
+        "prev_period_label": prev_period_label,
     }
